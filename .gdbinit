@@ -80,6 +80,7 @@ set *$GPIOx_AFRL &= ~(0x0000F000)
 ####################################################################
 
 source /home/alex/projects/arduino/orbuculum/Support/gdbtrace.init
+dwtTraceException 1
 dwtSamplePC 1
 dwtSyncTap 3
 dwtPostTap 1
