@@ -1,0 +1,94 @@
+!killall openocd
+!orbtrace -p vtpwr,3.3 -e vtpwr,on
+!orbtrace --trace-format m
+!openocd -f envie_m7.ocd &
+file /tmp/arduino/sketches/817DC06D31EFAD33501697C59B5B9880/Blink.ino.elf
+target extended-remote localhost:3333
+set mem inaccessible-by-default off
+set print pretty
+break main
+#load
+
+####################################################################
+
+set $SWO_BASE = 0x5C003000
+set $SWO_CODR = $SWO_BASE + 0x010
+set $SWO_SPPR = $SWO_BASE + 0x0F0
+set $SWO_LAR  = $SWO_BASE + 0xFB0
+set $SWO_LSR  = $SWO_BASE + 0xFB4
+
+set $SWTF_BASE = 0x5C004000
+set $SWTF_CTRL = $SWTF_BASE + 0x000
+set $SWTF_LAR  = $SWTF_BASE + 0xFB0
+set $SWTF_LSR  = $SWTF_BASE + 0xFB4
+
+set $DBGMCU_BASE = 0x5C001000
+set $DBGMCU_CR   = $DBGMCU_BASE + 0x04
+
+####################################################################
+
+# DBGMCU_CR: enable clock domains for debugging
+# D3DBGCKEN | D1DBGCKEN | TRACECLKEN
+set *$DBGMCU_CR |= (1<<22) | (1<<21) | (1<<20)
+
+# Unlock for modifications
+set *$SWO_LAR  = 0xC5ACCE55
+x/1dw $SWO_LSR
+
+# Calculate and set bit-rate prescaler
+set $SYSTEM_CORE_CLOCK_Hz = 480*1000*1000
+set $SWO_SPEED_Hz = 48*1000*1000
+set $SWO_PRESCALER = ($SYSTEM_CORE_CLOCK_Hz / $SWO_SPEED_Hz) - 1
+print $SWO_PRESCALER
+set *$SWO_CODR = $SWO_PRESCALER
+x/1dw $SWO_CODR
+
+# Configure for manchester encoding.
+set *$SWO_SPPR = 0x00000001
+
+# Unlock for modifications
+set *$SWTF_LAR = 0xC5ACCE55
+x/1dw $SWTF_LSR
+
+# Enable SWO.
+set *$SWTF_CTRL |= 0x00000001
+
+####################################################################
+
+set $RCC_BASE_ADDR = 0x58024400
+set $RCC_AHB4ENR   = $RCC_BASE_ADDR + 0xE0
+
+set $GPIOB_BASE_ADDR = 0x58020400
+set $GPIOB_MODER     = $GPIOB_BASE_ADDR + 0x00
+set $GPIOB_OSPEEDR   = $GPIOB_BASE_ADDR + 0x08
+set $GPIOB_PUDR      = $GPIOB_BASE_ADDR + 0x0C
+set $GPIOx_AFRL      = $GPIOB_BASE_ADDR + 0x20
+
+# STM32H747 / M7 CORE - TRACESWO = PB3
+# enable peripheral clock for Port B
+set *$RCC_AHB4ENR |= 0x000000002
+# enable alternate function mode
+set *$GPIOB_MODER &= ~(0x000000C0)
+set *$GPIOB_MODER |=  (0x00000080)
+# set speed to very high speed
+set *$GPIOB_OSPEEDR |=  (0x00000080)
+# no pull-up, no pull-down
+set *$GPIOB_PUDR &= ~(0x000000C0)
+# set to alternate function #0 (= TRACESWO)
+set *$GPIOx_AFRL &= ~(0x0000F000)
+
+####################################################################
+
+source /home/alex/projects/arduino/orbuculum/Support/gdbtrace.init
+dwtSamplePC 1
+dwtSyncTap 3
+dwtPostTap 1
+dwtPostInit 1
+dwtPostReset 10
+dwtCycEna 1
+ITMTXEna 1
+ITMEna 1
+
+####################################################################
+
+run
