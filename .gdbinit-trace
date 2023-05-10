@@ -10,35 +10,45 @@ set print pretty
 break main
 ####################################################################
 source /home/alex/projects/arduino/orbuculum/Support/gdbtrace.init
+####################################################################
 
 # STM32H747 / M7 CORE
 # TRACEDATACLK = PE2
 # TRACEDATA0   = PE3
-
-set $DBGMCU_BASE = 0x5C001000
-set $DBGMCU_CR   = $DBGMCU_BASE + 0x04
-
-set $SYSCFG_BASE_ADDR = 0x58000400
-set $SYSCFG_CCCSR     = $SYSCFG_BASE_ADDR + 0x20
-
-set $RCC_BASE_ADDR = 0x58024400
-set $RCC_AHB4ENR   = $RCC_BASE_ADDR + 0xE0
-set $RCC_APB4ENR   = $RCC_BASE_ADDR + 0xF4
-
-set $GPIOE_BASE_ADDR = 0x58021000
-set $GPIOE_MODER     = $GPIOE_BASE_ADDR + 0x00
-set $GPIOE_OSPEEDR   = $GPIOE_BASE_ADDR + 0x08
-set $GPIOE_PUDR      = $GPIOE_BASE_ADDR + 0x0C
-set $GPIOE_AFRL      = $GPIOE_BASE_ADDR + 0x20
-
-####################################################################
-
 define enableTraceSTM32H747_M7
+
+  set $DBGMCU_BASE = 0x5C001000
+  set $DBGMCU_CR   = $DBGMCU_BASE + 0x04
+
+  set $SYSCFG_BASE_ADDR = 0x58000400
+  set $SYSCFG_CCCSR     = $SYSCFG_BASE_ADDR + 0x20
+
+  set $RCC_BASE_ADDR = 0x58024400
+  set $RCC_AHB4ENR   = $RCC_BASE_ADDR + 0xE0
+  set $RCC_APB4ENR   = $RCC_BASE_ADDR + 0xF4
+
+  set $GPIOE_BASE_ADDR = 0x58021000
+  set $GPIOE_MODER     = $GPIOE_BASE_ADDR + 0x00
+  set $GPIOE_OSPEEDR   = $GPIOE_BASE_ADDR + 0x08
+  set $GPIOE_PUDR      = $GPIOE_BASE_ADDR + 0x0C
+  set $GPIOE_AFRL      = $GPIOE_BASE_ADDR + 0x20
+
+  set $SWTF_BASE = 0x5C004000
+  set $SWTF_CTRL = $SWTF_BASE + 0x000
+  set $SWTF_LAR  = $SWTF_BASE + 0xFB0
+  set $SWTF_LSR  = $SWTF_BASE + 0xFB4
 
   # enable SYSCFG peripheral clock (Bit #1: SYSCFGEN)
   set *$RCC_APB4ENR |= 0x00000002
   # enable I/O compensation cell (Bit #0: EN)
   set *$SYSCFG_CCCSR |= 0x00000001
+
+  # Unlock for modifications
+  set *$SWTF_LAR = 0xC5ACCE55
+  x/1dw $SWTF_LSR
+
+  # Enable SWO (Bit #1: ENS0 = Slave port S0 enable)
+  set *$SWTF_CTRL |= 0x00000001
 
   # enable peripheral clock for Port E (Bit #4: GPIOEEN)
   set *$RCC_AHB4ENR |= 0x000000010
@@ -56,13 +66,31 @@ define enableTraceSTM32H747_M7
   # D3DBGCKEN | D1DBGCKEN | TRACECLKEN
   set *$DBGMCU_CR |= (1<<22) | (1<<21) | (1<<20)
 
+
+
+  set $CDBBASE  = 0xE000EDF0
+  set $DWTBASE  = 0xE0001000
+  set $ITMBASE  = 0xE0000000
+  set $TPIUBASE = 0xE0040000
+  set $ETMBASE  = 0xE0041000
+
   # Enable Trace TRCENA (DCB DEMCR)
-  set $CDBBASE=0xE000EDF0
   set *($CDBBASE+0xC)=(1<<24)
 
-  # Finally start the trace output
-  set $bits=1
-  _doTRACE
+  # Start the trace output
+  set *($ITMBASE  + 0xfb0) = 0xc5acce55
+  set *($ETMBASE  + 0xfb0) = 0xc5acce55
+  set *($TPIUBASE + 0xfb0) = 0xc5acce55
+
+  set $TPIU_CSPSR = $TPIUBASE + 0x04
+  set $TPIU_SPPR  = $TPIUBASE + 0xF0
+
+  # configure width of the current parallel trace port to 1.
+  set *$TPIU_CSPSR = (1<<0)
+
+  # configure TPIU for parallel trace port mode.
+  set *$TPIU_SPPR &= ~0x00000003
+
 
   dwtSamplePC 1
   dwtSyncTap 3
