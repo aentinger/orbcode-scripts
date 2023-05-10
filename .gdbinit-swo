@@ -70,7 +70,7 @@ set *$RCC_AHB4ENR |= 0x000000002
 # enable alternate function mode
 set *$GPIOB_MODER &= ~(0x000000C0)
 set *$GPIOB_MODER |=  (0x00000080)
-# set speed to very high speed
+# set speed to high speed
 set *$GPIOB_OSPEEDR |=  (0x00000080)
 # no pull-up, no pull-down
 set *$GPIOB_PUDR &= ~(0x000000C0)
