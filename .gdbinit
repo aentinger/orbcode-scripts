@@ -1,7 +1,7 @@
 !killall openocd
 !orbtrace -p vtpwr,3.3 -e vtpwr,on
 !orbtrace --trace-format m
-!openocd -f envie_m7.ocd &
+!openocd -f arduino-portenta-h7.ocd &
 file /tmp/arduino/sketches/817DC06D31EFAD33501697C59B5B9880/Blink.ino.elf
 target extended-remote localhost:3333
 set mem inaccessible-by-default off
