@@ -9,6 +9,7 @@ Note down the path to where the ELF-file is stored and edit [.gdbinit](.gdbinit)
 
 Start GDB using .gdbinit contained in this repository:
 ```bash
+ln -s .gdbinit-swo .gdbinit
 arm-none-eabi-gdb -iex 'add-auto-load-safe-path .'
 ```
 Start [orbuculum](https://github.com/orbcode/orbuculum):
