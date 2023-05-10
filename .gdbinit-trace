@@ -33,68 +33,53 @@ set $GPIOE_AFRL      = $GPIOE_BASE_ADDR + 0x20
 
 ####################################################################
 
-# DBGMCU_CR: enable clock domains for debugging
-# D3DBGCKEN | D1DBGCKEN | TRACECLKEN
-set *$DBGMCU_CR |= (1<<22) | (1<<21) | (1<<20)
+define enableTraceSTM32H747_M7
 
-set $bits = 1
-set $drive = 1
+  # enable SYSCFG peripheral clock (Bit #1: SYSCFGEN)
+  set *$RCC_APB4ENR |= 0x00000002
+  # enable I/O compensation cell (Bit #0: EN)
+  set *$SYSCFG_CCCSR |= 0x00000001
 
-# enable peripheral clock for Port E
-set *$RCC_AHB4ENR |= 0x000000010
+  # enable peripheral clock for Port E (Bit #4: GPIOEEN)
+  set *$RCC_AHB4ENR |= 0x000000010
+  # enable alternate function mode
+  set *$GPIOE_MODER &= ~0x000000F0
+  set *$GPIOE_MODER |=  0x000000A0
+  # set speed to high speed
+  set *$GPIOE_OSPEEDR |= 0x000000A0
+  # no pull-up, no pull-down
+  set *$GPIOE_PUDR &= ~0x000000F0
+  # set to alternate function #0 (TRACECLK, TRACED0)
+  set *$GPIOE_AFRL &= ~0x0000FF00
 
-# enable SYSCFG peripheral clock
-set *$RCC_APB4ENR |= 0x00000001
+  # DBGMCU_CR: enable clock domains for debugging
+  # D3DBGCKEN | D1DBGCKEN | TRACECLKEN
+  set *$DBGMCU_CR |= (1<<22) | (1<<21) | (1<<20)
 
-# Enable compensation cell
-set *$SYSCFG_CCCSR |= 0x00000001
+  # Enable Trace TRCENA (DCB DEMCR)
+  set $CDBBASE=0xE000EDF0
+  set *($CDBBASE+0xC)=(1<<24)
 
-# Setup PE2 & PE3
-# enable alternate function mode
-set *$GPIOE_MODER &= ~(0x000000F0)
-set *$GPIOE_MODER |= 0xA0
+  # Finally start the trace output
+  set $bits=1
+  _doTRACE
 
-# Drive speed
-set *$GPIOE_OSPEEDR &= ~0xf0
-set *$GPIOE_OSPEEDR |= ($drive<<4)|($drive<<6)
+  dwtSamplePC 1
+  dwtSyncTap 3
+  dwtPostTap 1
+  dwtPostInit 1
+  dwtPostReset 10
+  dwtCycEna 1
 
-# no pull-up, no pull-down
-set *$GPIOE_PUDR &= ~0xF0
-# AF0
-set *$GPIOE_AFRL &= ~0xF0
+  ITMId 1
+  ITMGTSFreq 3
+  ITMTSPrescale 3
+  ITMTXEna 1
+  ITMSYNCEna 1
+  ITMEna 1
 
-# Set number of bits in DBGMCU_CR
-#set *0xE0042004 &= ~(3<<6)
-
-if ($bits<3)
-   set *0xE0042004 |= ((($bits+1)<<6) | (1<<5))
-else
-   set *0xE0042004 |= ((3<<6) | (1<<5))
+  ITMTER 0 0xFFFFFFFF
+  ITMTPR 0xFFFFFFFF
 end
-
-# Enable Trace TRCENA (DCB DEMCR)
-set *($CDBBASE+0xC)=(1<<24)
-
-# Finally start the trace output
-_doTRACE
-
-
-
-dwtSamplePC 1
-dwtSyncTap 3
-dwtPostTap 1
-dwtPostInit 1
-dwtPostReset 10
-dwtCycEna 1
-
-ITMId 1
-ITMGTSFreq 3
-ITMTSPrescale 3
-ITMTXEna 1
-ITMSYNCEna 1
-ITMEna 1
-
-ITMTER 0 0xFFFFFFFF
-ITMTPR 0xFFFFFFFF
 ####################################################################
 run

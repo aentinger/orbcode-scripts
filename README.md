@@ -51,3 +51,15 @@ which results in i.e.
 
 [---H] Interval = 999mS
 ```
+
+### How-to-trace using TRACECLK / TRACED0 and ORBTrace mini
+```bash
+ln -s .gdbinit-trace .gdbinit
+arm-none-eabi-gdb -iex 'add-auto-load-safe-path .'
+...
+c
+Ctrl+C
+enableTraceSTM32H747_M7
+c
+....
+```
